@@ -14,10 +14,12 @@
         <maven.compiler.target>21</maven.compiler.target>
 
         <javafx.version>23.0.1</javafx.version>
-        <mainClass>Presentation.Main</mainClass>
+
+        <mainClass>Main</mainClass>
 
         <jpackage.inputDir>${project.build.directory}/jpackage-input</jpackage.inputDir>
         <jpackage.outputDir>${project.build.directory}/jpackage-out</jpackage.outputDir>
+        <appName>IDeduplicator</appName>
     </properties>
 
     <dependencies>
@@ -42,7 +44,6 @@
 
     <build>
         <plugins>
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -76,19 +77,6 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.5.0</version>
             </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-resources-plugin</artifactId>
-                <version>3.3.1</version>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-clean-plugin</artifactId>
-                <version>3.3.2</version>
-            </plugin>
-
         </plugins>
     </build>
 
@@ -97,104 +85,70 @@
             <id>jpackage</id>
             <build>
                 <plugins>
-
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-clean-plugin</artifactId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <version>3.1.0</version>
                         <executions>
                             <execution>
                                 <id>clean-jpackage-folders</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>clean</goal>
-                                </goals>
+                                <phase>initialize</phase>
+                                <goals><goal>run</goal></goals>
                                 <configuration>
-                                    <filesets>
-                                        <fileset>
-                                            <directory>${jpackage.inputDir}</directory>
-                                        </fileset>
-                                        <fileset>
-                                            <directory>${jpackage.outputDir}</directory>
-                                        </fileset>
-                                    </filesets>
+                                    <target>
+                                        <delete dir="${jpackage.inputDir}" quiet="true"/>
+                                        <delete dir="${jpackage.outputDir}" quiet="true"/>
+                                    </target>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>stage-main-jar</id>
+                                <phase>package</phase>
+                                <goals><goal>run</goal></goals>
+                                <configuration>
+                                    <target>
+                                        <mkdir dir="${jpackage.inputDir}"/>
+                                        <copy file="${project.build.directory}/${project.build.finalName}.jar"
+                                              todir="${jpackage.inputDir}"/>
+                                    </target>
                                 </configuration>
                             </execution>
                         </executions>
                     </plugin>
-
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-dependency-plugin</artifactId>
                         <executions>
                             <execution>
-                                <id>copy-deps</id>
+                                <id>copy-deps-to-jpackage-input</id>
                                 <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>copy-dependencies</goal>
-                                </goals>
+                                <goals><goal>copy-dependencies</goal></goals>
                                 <configuration>
-                                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                                    <outputDirectory>${jpackage.inputDir}</outputDirectory>
                                     <includeScope>runtime</includeScope>
                                 </configuration>
                             </execution>
                         </executions>
                     </plugin>
-
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-resources-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>stage-jpackage-input</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>copy-resources</goal>
-                                </goals>
-                                <configuration>
-                                    <outputDirectory>${jpackage.inputDir}</outputDirectory>
-                                    <resources>
-                                        <resource>
-                                            <directory>${project.build.directory}</directory>
-                                            <includes>
-                                                <include>${project.build.finalName}.jar</include>
-                                            </includes>
-                                        </resource>
-
-                                        <resource>
-                                            <directory>${project.build.directory}/lib</directory>
-                                            <targetPath>lib</targetPath>
-                                        </resource>
-                                    </resources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>exec-maven-plugin</artifactId>
                         <executions>
                             <execution>
                                 <id>make-app-image</id>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>exec</goal>
-                                </goals>
+                                <phase>verify</phase>
+                                <goals><goal>exec</goal></goals>
                                 <configuration>
                                     <executable>jpackage</executable>
                                     <arguments>
                                         <argument>--type</argument><argument>app-image</argument>
-                                        <argument>--name</argument><argument>IDeduplicator</argument>
+                                        <argument>--name</argument><argument>${appName}</argument>
 
                                         <argument>--input</argument><argument>${jpackage.inputDir}</argument>
                                         <argument>--main-jar</argument><argument>${project.build.finalName}.jar</argument>
                                         <argument>--main-class</argument><argument>${mainClass}</argument>
 
                                         <argument>--dest</argument><argument>${jpackage.outputDir}</argument>
-
-                                        <argument>--java-options</argument>
-                                        <argument>--class-path</argument>
-                                        <argument>lib/*</argument>
                                     </arguments>
                                 </configuration>
                             </execution>
