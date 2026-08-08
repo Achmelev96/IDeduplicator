@@ -10,6 +10,7 @@ import javafx.scene.shape.Circle;
 
 import java.nio.file.Path;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 public final class PhotoCard extends StackPane {
 
@@ -20,7 +21,7 @@ public final class PhotoCard extends StackPane {
     private final Circle selectCircle;
     private boolean selected;
 
-    public PhotoCard(Path path, BiConsumer<Path, Boolean> onToggle) {
+    public PhotoCard(Path path, BiConsumer<Path, Boolean> onToggle, Consumer<Path> onPreview) {
         this.path = path;
 
         setPrefSize(CARD_W, CARD_H);
@@ -57,7 +58,11 @@ public final class PhotoCard extends StackPane {
         };
 
         selectCircle.setOnMouseClicked(e -> { e.consume(); toggle.run(); });
-        setOnMouseClicked(e -> toggle.run());
+        imageView.setOnMouseClicked(e -> {
+            e.consume();
+            onPreview.accept(this.path);
+        });
+        setOnMouseClicked(e -> onPreview.accept(this.path));
     }
 
     public Path getPath() {

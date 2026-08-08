@@ -9,6 +9,9 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.ToolBar;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
@@ -29,6 +32,7 @@ public class MainFX extends Application {
     private final Set<Path> selected = ConcurrentHashMap.newKeySet();
     private final Map<Path, PhotoCard> pathToCard = new ConcurrentHashMap<>();
     private final List<Path> allImages = Collections.synchronizedList(new ArrayList<>());
+    private StackPane appRoot;
 
     private static final int UI_BATCH_SIZE = 100;
     private static final double DUP_THRESHOLD = 0.20;
@@ -71,16 +75,17 @@ public class MainFX extends Application {
         scrollPane.setFitToWidth(true);
         scrollPane.setPannable(true);
 
-        BorderPane root = new BorderPane();
-        root.setTop(toolbar);
-        root.setCenter(scrollPane);
+        BorderPane content = new BorderPane();
+        content.setTop(toolbar);
+        content.setCenter(scrollPane);
+        appRoot = new StackPane(content);
 
         setPathBtn.setOnAction(e -> chooseAndScanFolder(stage));
         deleteBtn.setOnAction(e -> deleteSelected());
         scanBtn.setOnAction(e -> runDuplicateScan());
 
         stage.setTitle("IDeduplicator");
-        Scene scene = new Scene(root, 1000, 600);
+        Scene scene = new Scene(appRoot, 1000, 600);
         scene.getStylesheets().add("data:text/css," + DARK_CSS.replace(" ", "%20"));
         stage.setScene(scene);
         stage.show();
@@ -105,7 +110,11 @@ public class MainFX extends Application {
             List<PhotoCard> batch = new ArrayList<>(UI_BATCH_SIZE);
 
             scanner.scan(root, imagePath -> {
-                PhotoCard card = PhotoCardFactory.create(imagePath, this::onToggleSelection);
+                PhotoCard card = PhotoCardFactory.create(
+                        imagePath,
+                        this::onToggleSelection,
+                        this::showImagePreview
+                );
 
                 pathToCard.put(imagePath, card);
                 allImages.add(imagePath);
@@ -173,6 +182,45 @@ public class MainFX extends Application {
         if (isSelectedNow) selected.add(path);
         else selected.remove(path);
         updateDeleteButton();
+    }
+
+    private void showImagePreview(Path path) {
+        Image image = new Image(path.toUri().toString(), true);
+        ImageView imageView = new ImageView(image);
+        imageView.setPreserveRatio(true);
+        imageView.setSmooth(true);
+        imageView.fitWidthProperty().bind(appRoot.widthProperty().multiply(0.9));
+        imageView.fitHeightProperty().bind(appRoot.heightProperty().multiply(0.9));
+
+        Button closeButton = new Button("\u2715");
+        closeButton.setStyle("""
+                -fx-background-color: rgba(35, 35, 35, 0.9);
+                -fx-text-fill: white;
+                -fx-font-size: 18px;
+                -fx-font-weight: bold;
+                -fx-background-radius: 20px;
+                -fx-min-width: 40px;
+                -fx-min-height: 40px;
+                -fx-cursor: hand;
+                """);
+
+        StackPane overlay = new StackPane(imageView, closeButton);
+        overlay.setStyle("-fx-background-color: rgba(0, 0, 0, 0.88);");
+        StackPane.setAlignment(closeButton, javafx.geometry.Pos.TOP_RIGHT);
+        StackPane.setMargin(closeButton, new Insets(18));
+
+        Runnable close = () -> appRoot.getChildren().remove(overlay);
+        closeButton.setOnAction(e -> close.run());
+        overlay.setOnMouseClicked(e -> close.run());
+        imageView.setOnMouseClicked(e -> e.consume());
+
+        overlay.setFocusTraversable(true);
+        overlay.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ESCAPE) close.run();
+        });
+
+        appRoot.getChildren().add(overlay);
+        overlay.requestFocus();
     }
 
     private void updateDeleteButton() {
